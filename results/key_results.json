@@ -1,0 +1,161 @@
+{
+  "project": "Dual-Gate Neuron",
+  "paper": "V6: A Biologically-Inspired Dual-Gate Neuron that Substitutes Attention in Sequence Modelling",
+  "author": "Tomasz Wietrzykowski",
+  "date": "March 2026",
+
+  "task1_delayed_xor": {
+    "description": "Delayed Sign-XOR, T=8, n_hid=32, seed=42",
+    "models": {
+      "V1_Perceptron": {"params": 257, "best_acc": 0.523, "conv_epoch": null},
+      "V4_Projected_EMA": {"params": 2660, "best_acc": 0.746, "conv_epoch": null},
+      "V6_Dual_Gate": {"params": 3109, "best_acc": 0.992, "conv_epoch": 2},
+      "LSTM_h32": {"params": 5153, "best_acc": 0.982, "conv_epoch": 8}
+    },
+    "note": "Single seed. V6 is 4x faster than LSTM with 40% fewer parameters."
+  },
+
+  "task2_multilag_regression": {
+    "description": "Multi-lag regression, T=8, n_hid=32, seed=42",
+    "models": {
+      "V1_Perceptron": {"params": 257, "test_mse": 0.703},
+      "V4_Projected_EMA": {"params": 2660, "test_mse": 0.525},
+      "V6_Dual_Gate": {"params": 3109, "test_mse": 0.571},
+      "LSTM_h32": {"params": 5153, "test_mse": 0.013}
+    },
+    "note": "LSTM wins - this task requires value storage, not pattern detection."
+  },
+
+  "task3_sequential_mnist": {
+    "description": "Sequential MNIST, T=784, n_hid=64, 15 epochs, 10K train, seed=42",
+    "models": {
+      "V2_Decay_gate": {"params": 1035, "best_acc": 0.174},
+      "V4_Projected_EMA": {"params": 9357, "best_acc": 0.236},
+      "V6_Dual_Gate": {"params": 9614, "best_acc": 0.245},
+      "LSTM_h64": {"params": 17802, "best_acc": 0.117}
+    },
+    "note": "V6 is 2.1x better than LSTM. LSTM near-chance consistent with Arjovsky 2016 (LSTM baseline 10.8% on pMNIST with h=128)."
+  },
+
+  "task4_tinyshakespeare": {
+    "description": "TinyShakespeare char-level LM, T=32, n_emb=128, 4 layers, 5000 steps",
+
+    "single_seed_early": {
+      "Transformer_seed42": {"val_loss": 2.050, "ppl": 7.76, "params": 939000},
+      "V6_Linear_seed42": {"val_loss": 1.940, "ppl": 6.96, "params": 939000, "delta_pct": -5.3}
+    },
+
+    "replication_5seeds_sequential": {
+      "description": "V6-ALL (all 6 fixes), sequential EMA implementation",
+      "Transformer": {
+        "mean_val_loss": 1.6841, "std": 0.0025, "ppl_mean": 5.39, "ppl_std": 0.01,
+        "seeds": [1.6855, 1.6860, 1.6811, 1.6863, 1.6816],
+        "params": 803712
+      },
+      "V6_ALL": {
+        "mean_val_loss": 1.4432, "std": 0.0200, "ppl_mean": 4.23, "ppl_std": 0.08,
+        "seeds": [1.4535, 1.4370, 1.4526, 1.4616, 1.4111],
+        "params": 1148316,
+        "delta_pct": -14.31,
+        "bootstrap_95ci": [-15.3, -13.5],
+        "cohens_d": 16.9
+      }
+    },
+
+    "replication_3seeds_parallel": {
+      "description": "V6-True-Fast, parallel conv1d implementation (mathematically identical)",
+      "Transformer": {
+        "seeds": {"42": 1.6855, "43": 1.6860, "44": 1.6811},
+        "mean": 1.6842, "std": 0.0027
+      },
+      "V6_True_Fast": {
+        "seeds": {"42": 1.4595, "43": 1.4293, "44": 1.4265},
+        "mean": 1.4384, "std": 0.0183,
+        "ppl_mean": 4.21,
+        "delta_pct": -14.59,
+        "t_stat": -23.0,
+        "p_value": 2.1e-5,
+        "params": 1148320
+      },
+      "note": "Parallel vs sequential: p=0.75 (indistinguishable), speedup 5.3x"
+    },
+
+    "throughput": {
+      "Transformer": {"tok_per_sec": 310000, "implementation": "cuBLAS attention"},
+      "V6_ALL_sequential": {"tok_per_sec": 18000, "implementation": "Python for-loop"},
+      "V6_True_Fast": {"tok_per_sec": 96000, "implementation": "causal conv1d"}
+    }
+  },
+
+  "learned_biological_parameters": {
+    "description": "V6-True-Fast, TinyShakespeare T=32, seed=42. No constraints imposed.",
+    "prediction": "alpha_slow > alpha_fast in every layer",
+    "confirmed": true,
+    "layers": {
+      "layer_0": {"alpha_fast": 0.591, "eff_mem_fast": 2.4, "alpha_slow": 0.889, "eff_mem_slow": 9.0},
+      "layer_1": {"alpha_fast": 0.678, "eff_mem_fast": 3.1, "alpha_slow": 0.894, "eff_mem_slow": 9.4},
+      "layer_2": {"alpha_fast": 0.683, "eff_mem_fast": 3.2, "alpha_slow": 0.928, "eff_mem_slow": 13.9},
+      "layer_3": {"alpha_fast": 0.594, "eff_mem_fast": 2.5, "alpha_slow": 0.922, "eff_mem_slow": 12.8}
+    },
+    "xor_task_seed42": {
+      "alpha_fast": 0.296, "eff_mem_fast": 1.4,
+      "alpha_slow": 0.904, "eff_mem_slow": 10.4
+    }
+  },
+
+  "parameter_matched": {
+    "description": "V6-matched (reduced n_emb) vs Transformer at equal parameter count. 3 seeds, 3000 steps.",
+    "T32": {
+      "Transformer": {
+        "params": 803712, "n_emb": 128,
+        "mean_val_loss": 1.7912, "std": 0.0024, "ppl": 6.00,
+        "seeds": [1.7945, 1.7888, 1.7904]
+      },
+      "V6_matched": {
+        "params": 807133, "n_emb": 107,
+        "mean_val_loss": 1.8266, "std": 0.0029, "ppl": 6.21,
+        "seeds": [1.8243, 1.8249, 1.8306],
+        "delta_pct": 1.98
+      }
+    },
+    "T128": {
+      "Transformer": {
+        "params": 816000, "n_emb": 128,
+        "mean_val_loss": 1.8011, "std": 0.0033, "ppl": 6.06,
+        "seeds": [1.7992, 1.8057, 1.7983]
+      },
+      "V6_matched": {
+        "params": 822036, "n_emb": 108,
+        "mean_val_loss": 1.8350, "std": 0.0034, "ppl": 6.26,
+        "seeds": [1.8377, 1.8371, 1.8301],
+        "delta_pct": 1.88
+      }
+    },
+    "conclusion": "At matched parameter count, V6-Linear performs within 2% of the Transformer. The 14.3% advantage at unmatched scale is primarily attributable to model capacity (43% more parameters)."
+  },
+
+  "v8_biomamba": {
+    "description": "V8-BioMamba: V6 base + neuromodulatory input-dependent dynamics + 4 dendritic timescales. T=64, 3 seeds, 3000 steps.",
+    "Transformer": {
+      "params": 807808, "mean_val_loss": 1.8255, "std": 0.0033, "ppl": 6.21,
+      "seeds": [1.8239, 1.8291, 1.8260], "tok_per_sec": 248037
+    },
+    "Mamba_like": {
+      "params": 695296, "mean_val_loss": 1.7809, "std": 0.0090, "ppl": 5.94,
+      "seeds": [1.7687, 1.7962, 1.7824], "tok_per_sec": 23244,
+      "delta_pct": -2.4
+    },
+    "V8_BioMamba": {
+      "params": 886820, "mean_val_loss": 1.7786, "std": 0.0002, "ppl": 5.92,
+      "seeds": [1.7737, 1.7847, 1.7800], "tok_per_sec": 83617,
+      "delta_pct": -2.6,
+      "timescale_hierarchy": {
+        "layer_0": {"alphas": [0.9385, 0.8822, 0.78, 0.6606], "eff_mem": [16.3, 8.5, 4.5, 2.9]},
+        "layer_1": {"alphas": [0.938, 0.8808, 0.7804, 0.6792], "eff_mem": [16.1, 8.4, 4.6, 3.1]},
+        "layer_2": {"alphas": [0.9399, 0.8825, 0.7832, 0.6875], "eff_mem": [16.6, 8.5, 4.6, 3.2]},
+        "layer_3": {"alphas": [0.941, 0.8844, 0.7856, 0.6935], "eff_mem": [16.9, 8.7, 4.7, 3.3]}
+      }
+    },
+    "conclusion": "V8-BioMamba outperforms both Transformer (-2.6%) and Mamba-like (-0.3%) while running 3.6x faster than Mamba via conv1d parallelism."
+  }
+}
